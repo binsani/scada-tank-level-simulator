@@ -1,0 +1,1427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tank Level SCADA Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --cyan: #06b6d4;
+      --cyan-dark: #0891b2;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --panel-bg: rgba(10, 15, 30, 0.82);
+      --panel-border: rgba(56, 189, 248, 0.13);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #020617;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 10% 0%, rgba(6,182,212,0.13) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(16,185,129,0.09) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 60% at 50% 100%, rgba(56,189,248,0.07) 0%, transparent 60%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+
+    /* === SCROLLBAR === */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(15,23,42,0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.25); border-radius: 9px; }
+
+    /* === PANELS === */
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.06), 0 24px 60px rgba(0,0,0,0.5);
+    }
+
+    /* === TYPOGRAPHY === */
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .section-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.35em;
+      color: #475569;
+    }
+    .metric-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      line-height: 1;
+    }
+    .metric-unit {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-left: 2px;
+    }
+
+    /* === STATUS LEDs === */
+    .led {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-radius: 9999px;
+      padding: 0.2rem 0.7rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+    }
+    .led::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .led-cyan   { color:#22d3ee; background:rgba(6,182,212,0.1);  border:1px solid rgba(6,182,212,0.2); }
+    .led-cyan::before   { background:#22d3ee; box-shadow:0 0 6px #22d3ee; }
+    .led-green  { color:#34d399; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); }
+    .led-green::before  { background:#34d399; box-shadow:0 0 6px #34d399; }
+    .led-amber  { color:#fbbf24; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); }
+    .led-amber::before  { background:#fbbf24; box-shadow:0 0 6px #fbbf24; animation: blink 0.8s ease-in-out infinite; }
+    .led-red    { color:#f87171; background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.2); }
+    .led-red::before    { background:#f87171; box-shadow:0 0 6px #f87171; animation: blink 0.5s ease-in-out infinite; }
+    .led-slate  { color:#94a3b8; background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.15); }
+    .led-slate::before  { background:#94a3b8; animation:none; }
+
+    /* === NAV === */
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 1rem;
+      border-radius: 0.6rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .nav-tab:hover { color: #94a3b8; background: rgba(255,255,255,0.04); }
+    .nav-tab.active {
+      color: #22d3ee;
+      background: rgba(6,182,212,0.1);
+      border-color: rgba(6,182,212,0.25);
+    }
+    .nav-tab .icon { font-size: 1rem; }
+
+    /* === BUTTONS === */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      border-radius: 0.75rem;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s;
+      border: none;
+      letter-spacing: 0.03em;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-start  { background:linear-gradient(135deg,#059669,#10b981); color:#fff; box-shadow:0 4px 18px rgba(16,185,129,0.3); }
+    .btn-start:hover  { background:linear-gradient(135deg,#10b981,#34d399); box-shadow:0 6px 24px rgba(16,185,129,0.45); }
+    .btn-stop   { background:linear-gradient(135deg,#b45309,#f59e0b); color:#0f172a; box-shadow:0 4px 18px rgba(245,158,11,0.25); }
+    .btn-stop:hover   { box-shadow:0 6px 24px rgba(245,158,11,0.4); }
+    .btn-reset  { background:linear-gradient(135deg,#0e7490,#06b6d4); color:#fff; box-shadow:0 4px 18px rgba(6,182,212,0.25); }
+    .btn-reset:hover  { box-shadow:0 6px 24px rgba(6,182,212,0.4); }
+    .btn-danger { background:linear-gradient(135deg,#b91c1c,#ef4444); color:#fff; box-shadow:0 4px 18px rgba(239,68,68,0.25); }
+    .btn-danger:hover { box-shadow:0 6px 24px rgba(239,68,68,0.4); }
+    .btn-slate  { background:rgba(51,65,85,0.8); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); }
+    .btn-slate:hover  { background:rgba(71,85,105,0.8); color:#e2e8f0; }
+    .btn-save   { background:linear-gradient(135deg,#7c3aed,#8b5cf6); color:#fff; box-shadow:0 4px 18px rgba(139,92,246,0.3); }
+    .btn-save:hover   { box-shadow:0 6px 24px rgba(139,92,246,0.45); }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 0.5rem; }
+
+    /* === TANK === */
+    @keyframes wave {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .wave-layer { animation: wave 3.5s linear infinite; }
+    .wave-layer-2 { animation: wave 2.8s linear infinite reverse; opacity: 0.5; }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+    .tank-scanline { animation: scanline 4s linear infinite; }
+
+    /* === KPI CARD === */
+    .kpi-card {
+      background: rgba(10,15,30,0.6);
+      border: 1px solid rgba(56,189,248,0.1);
+      border-radius: 1rem;
+      padding: 1rem;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .kpi-card:hover { border-color: rgba(56,189,248,0.25); box-shadow: 0 0 20px rgba(56,189,248,0.06); }
+
+    /* === TABLE === */
+    table { border-collapse: collapse; width: 100%; }
+    thead th { padding: 0.6rem 1rem; text-align: left; font-size: 0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; color:#475569; border-bottom: 1px solid rgba(56,189,248,0.1); }
+    tbody tr { border-bottom: 1px solid rgba(56,189,248,0.06); transition:background 0.15s; }
+    tbody tr:hover { background: rgba(56,189,248,0.03); }
+    tbody td { padding: 0.75rem 1rem; font-size: 0.83rem; color: #cbd5e1; }
+
+    /* === FORM INPUTS === */
+    .form-input {
+      width: 100%;
+      background: rgba(15,23,42,0.8);
+      border: 1px solid rgba(56,189,248,0.15);
+      border-radius: 0.625rem;
+      padding: 0.55rem 0.9rem;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    .form-input:focus { border-color: rgba(6,182,212,0.5); box-shadow: 0 0 0 3px rgba(6,182,212,0.08); }
+    .form-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: #64748b; margin-bottom: 0.35rem; display: block; }
+    .form-select {
+      width: 100%;
+      background: rgba(15,23,42,0.8);
+      border: 1px solid rgba(56,189,248,0.15);
+      border-radius: 0.625rem;
+      padding: 0.55rem 0.9rem;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .form-select:focus { border-color: rgba(6,182,212,0.5); }
+    input[type="range"] { accent-color: #06b6d4; width: 100%; cursor: pointer; }
+    .range-val { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #22d3ee; font-weight: 600; }
+
+    /* === ALARM SEVERITY BADGES === */
+    .badge { display:inline-block; border-radius:9999px; padding:0.15rem 0.65rem; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+    .badge-critical { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
+    .badge-high     { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); }
+    .badge-medium   { background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3); }
+    .badge-low      { background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); }
+
+    /* === VALVE INDICATOR === */
+    .valve-open { color:#34d399; }
+    .valve-closed { color:#64748b; }
+
+    /* === TOAST === */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: rgba(6,182,212,0.15);
+      border: 1px solid rgba(6,182,212,0.4);
+      border-radius: 0.75rem;
+      padding: 0.8rem 1.4rem;
+      font-size: 0.85rem;
+      color: #22d3ee;
+      backdrop-filter: blur(12px);
+      z-index: 999;
+      opacity: 0;
+      transform: translateY(1rem);
+      transition: all 0.35s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* === PAGE SECTIONS === */
+    .page { display:none; }
+    .page.active { display:block; }
+
+    /* === PROGRESS BAR === */
+    .progress-bar {
+      height: 6px;
+      border-radius: 9999px;
+      background: rgba(56,189,248,0.08);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #0284c7, #22d3ee);
+      transition: width 0.8s ease;
+      position: relative;
+    }
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0; bottom: 0;
+      width: 20px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4));
+    }
+  </style>
+</head>
+<body class="text-slate-200">
+
+<!-- TOAST -->
+<div id="toast">✓ Command executed</div>
+
+<!-- WRAPPER -->
+<div class="mx-auto max-w-[1900px] px-4 py-4 lg:px-6 space-y-4">
+
+  <!-- ===== HEADER ===== -->
+  <header class="panel px-5 py-3 flex flex-wrap items-center gap-4 justify-between">
+    <div class="flex items-center gap-4">
+      <div class="relative flex-shrink-0">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-black text-lg shadow-lg shadow-cyan-500/30">
+          ⚙
+        </div>
+        <span class="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-slate-950"></span>
+      </div>
+      <div>
+        <div class="section-label">Tank Level SCADA Simulator v2.0</div>
+        <h1 class="text-xl font-bold text-white tracking-tight">Industrial Water Tank Control Room</h1>
+      </div>
+    </div>
+
+    <!-- NAV TABS -->
+    <nav class="flex items-center gap-1 flex-wrap">
+      <button class="nav-tab active" onclick="showPage('dashboard', this)"><span class="icon">🖥</span> Dashboard</button>
+      <button class="nav-tab" onclick="showPage('alarms', this)"><span class="icon">🔔</span> Alarms <span id="alarm-badge" class="bg-red-500/20 text-red-400 text-[10px] border border-red-500/30 rounded-full px-1.5 py-0 font-bold hidden">2</span></button>
+      <button class="nav-tab" onclick="showPage('reports', this)"><span class="icon">📊</span> Reports</button>
+      <button class="nav-tab" onclick="showPage('settings', this)"><span class="icon">⚙</span> Settings</button>
+      <button class="nav-tab" onclick="showPage('users', this)"><span class="icon">👤</span> Users</button>
+    </nav>
+
+    <!-- STATUS STRIP -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="kpi-card px-3 py-1.5 text-center min-w-[70px]">
+        <div class="section-label">Time</div>
+        <div class="mono text-sm font-semibold text-white" id="hdr-time">--:--:--</div>
+      </div>
+      <span id="system-led" class="led led-cyan">SIMULATION</span>
+      <span id="mode-led" class="led led-green">AUTO</span>
+      <div class="kpi-card px-3 py-1.5 text-center hidden sm:block">
+        <div class="section-label">Operator</div>
+        <div class="text-sm font-semibold text-white">Sim. Op.</div>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <div id="page-dashboard" class="page active space-y-3">
+
+    <!-- KPI strip: compact single row -->
+    <div class="grid grid-cols-3 xl:grid-cols-6 gap-2">
+      <div class="kpi-card py-2 px-3 flex items-center justify-between">
+        <div>
+          <div class="section-label">Level</div>
+          <div class="mono text-lg font-bold text-white" id="kpi-level">35.0</div>
+        </div>
+        <div>
+          <div class="metric-unit text-right">%</div>
+          <div class="progress-bar mt-1 w-16"><div class="progress-fill" id="kpi-level-bar" style="width:35%"></div></div>
+        </div>
+      </div>
+      <div class="kpi-card py-2 px-3">
+        <div class="section-label">Volume</div>
+        <div class="mono text-lg font-bold text-white" id="kpi-volume">350 <span class="metric-unit">L</span></div>
+      </div>
+      <div class="kpi-card py-2 px-3">
+        <div class="section-label">Pressure</div>
+        <div class="mono text-lg font-bold text-white" id="kpi-pressure">1.80 <span class="metric-unit">bar</span></div>
+      </div>
+      <div class="kpi-card py-2 px-3">
+        <div class="section-label">Temperature</div>
+        <div class="mono text-lg font-bold text-white" id="kpi-temp">27.3 <span class="metric-unit">°C</span></div>
+      </div>
+      <div class="kpi-card py-2 px-3">
+        <div class="section-label">Flow Rate</div>
+        <div class="mono text-lg font-bold text-white" id="kpi-flow">18.4 <span class="metric-unit">L/m</span></div>
+      </div>
+      <div class="kpi-card py-2 px-3">
+        <div class="section-label">Energy</div>
+        <div class="mono text-lg font-bold text-white" id="kpi-energy">214.6 <span class="metric-unit">kWh</span></div>
+      </div>
+    </div>
+
+    <!-- Main grid -->
+    <div class="grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+
+      <!-- LEFT: Tank info + pump (compact) -->
+      <aside class="panel p-4 space-y-3 overflow-y-auto" style="max-height:calc(100vh - 160px)">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="section-label">Tank A-101</div>
+            <h2 class="text-base font-bold text-white mt-0.5">Process Information</h2>
+          </div>
+          <span id="pump-state-badge" class="led led-slate">STOPPED</span>
+        </div>
+        <!-- Compact metric rows -->
+        <div class="space-y-0.5 text-xs">
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Capacity</span><span class="mono font-semibold text-slate-200">1,000 L</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Level</span><span class="mono font-semibold text-cyan-400" id="info-level">35.0 %</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Volume</span><span class="mono font-semibold text-slate-200" id="info-vol">350 L</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Temperature</span><span class="mono font-semibold text-amber-400" id="info-temp">27.3 °C</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Pressure</span><span class="mono font-semibold text-blue-400" id="info-pres">1.80 bar</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Flow Rate</span><span class="mono font-semibold text-emerald-400" id="info-flow">18.4 L/min</span></div>
+        </div>
+        <div class="section-label pt-1">Pump Telemetry</div>
+        <div class="space-y-0.5 text-xs">
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Motor Current</span><span class="mono font-semibold text-slate-200" id="info-current">7.2 A</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Motor Temp</span><span class="mono font-semibold text-slate-200" id="info-mtemp">47.8 °C</span></div>
+          <div class="flex justify-between py-1.5 border-b border-slate-800/50"><span class="text-slate-500">Efficiency</span><span class="mono font-semibold text-emerald-400" id="info-eff">86.1 %</span></div>
+          <div class="flex justify-between py-1.5"><span class="text-slate-500">Run Hours</span><span class="mono font-semibold text-slate-200" id="info-hours">128.4 h</span></div>
+        </div>
+        <div class="section-label pt-1">Valve Status</div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="kpi-card py-2 text-center"><div class="section-label mb-0.5">Inlet</div><div id="valve-inlet" class="font-bold text-xs text-slate-500">CLOSED</div></div>
+          <div class="kpi-card py-2 text-center"><div class="section-label mb-0.5">Outlet</div><div id="valve-outlet" class="font-bold text-xs text-slate-500">CLOSED</div></div>
+        </div>
+      </aside>
+
+      <!-- CENTER: Tank Mimic -->
+      <main class="panel relative overflow-hidden p-5">
+        <!-- Background grid lines -->
+        <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-[length:40px_40px]"></div>
+        <!-- Glow spotlight -->
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(6,182,212,0.08),transparent)]"></div>
+
+        <div class="relative flex flex-col items-center gap-4">
+          <div>
+            <div class="section-label text-center">Live Tank Mimic — Process Tank A-101</div>
+          </div>
+
+          <!-- Level markings + tank + status -->
+          <div class="flex items-stretch gap-4 w-full max-w-[640px]">
+
+            <!-- Level scale left -->
+            <div class="flex flex-col justify-between text-right w-10 py-1 select-none" style="min-height:320px;">
+              <div class="text-[10px] font-semibold text-red-400 mono">HHHH<br>95%</div>
+              <div class="text-[10px] text-amber-400 mono">80%</div>
+              <div class="text-[10px] text-slate-500 mono">50%</div>
+              <div class="text-[10px] text-amber-400 mono">15%</div>
+              <div class="text-[10px] font-semibold text-red-400 mono">LLLL<br>5%</div>
+            </div>
+
+            <!-- Tank SVG container -->
+            <div class="relative flex-1 flex justify-center">
+              <!-- Pipes top -->
+              <div class="absolute -top-3 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                <div class="w-6 h-6 rounded-full border-2 border-cyan-500/40 bg-slate-900 flex items-center justify-center text-[10px] text-cyan-400">⬇</div>
+                <div class="w-1 h-6 bg-gradient-to-b from-cyan-500/40 to-transparent"></div>
+              </div>
+
+              <!-- Main tank body -->
+              <div class="relative w-[180px] rounded-[2rem] border-2 border-slate-600 bg-slate-950 overflow-hidden shadow-[0_0_40px_rgba(6,182,212,0.08),inset_0_0_40px_rgba(0,0,0,0.7)]" style="height: 320px;">
+                <!-- Grid lines inside tank -->
+                <div class="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.04)_1px,transparent_1px)] bg-[length:100%_48px] pointer-events-none z-10"></div>
+                <!-- Scanline sweep -->
+                <div class="tank-scanline absolute inset-x-0 h-16 bg-gradient-to-b from-transparent via-cyan-400/5 to-transparent pointer-events-none z-20"></div>
+
+                <!-- Threshold lines -->
+                <div class="absolute inset-x-0 z-10 pointer-events-none">
+                  <div style="bottom:95%;height:1px;" class="absolute inset-x-0 bg-red-500/50 border-t border-red-500/30"></div>
+                  <div style="bottom:80%;height:1px;" class="absolute inset-x-0 bg-amber-500/40 border-t border-amber-500/30"></div>
+                  <div style="bottom:15%;height:1px;" class="absolute inset-x-0 bg-amber-500/40 border-t border-amber-500/30"></div>
+                  <div style="bottom:5%;height:1px;"  class="absolute inset-x-0 bg-red-500/50 border-t border-red-500/30"></div>
+                </div>
+
+                <!-- Water fill area -->
+                <div id="tank-fill" class="absolute inset-x-0 bottom-0 overflow-hidden transition-all duration-1000 ease-out" style="height:35%;">
+                  <!-- Wave 1 -->
+                  <div class="absolute -top-3 left-0 w-[200%] h-8 opacity-90">
+                    <svg class="wave-layer w-full h-full" viewBox="0 0 200 20" preserveAspectRatio="none">
+                      <path d="M0,10 C25,0 50,20 75,10 C100,0 125,20 150,10 C175,0 200,20 200,10 L200,20 L0,20 Z" fill="rgba(14,165,233,0.6)"/>
+                    </svg>
+                  </div>
+                  <!-- Wave 2 -->
+                  <div class="absolute -top-2 left-0 w-[200%] h-8 opacity-60">
+                    <svg class="wave-layer-2 w-full h-full" viewBox="0 0 200 20" preserveAspectRatio="none">
+                      <path d="M0,10 C30,20 60,0 90,10 C120,20 150,0 180,10 L200,10 L200,20 L0,20 Z" fill="rgba(6,182,212,0.5)"/>
+                    </svg>
+                  </div>
+                  <!-- Water body -->
+                  <div class="absolute inset-0 top-4 bg-gradient-to-b from-sky-400/60 via-cyan-500/70 to-blue-600/80"></div>
+                  <!-- Shimmer highlights -->
+                  <div class="absolute inset-0 top-6 bg-[linear-gradient(105deg,transparent_30%,rgba(255,255,255,0.07)_50%,transparent_70%)]"></div>
+                </div>
+
+                <!-- Center level readout -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30">
+                  <div class="text-[2rem] font-black mono text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]" id="tank-pct">35.0%</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5 mono" id="tank-liters">350 L / 1000 L</div>
+                </div>
+
+                <!-- Inlet pipe left -->
+                <div class="absolute left-0 top-20 w-8 h-5 rounded-r-full border border-slate-500 bg-slate-800 -ml-4"></div>
+                <!-- Outlet pipe right -->
+                <div class="absolute right-0 bottom-16 w-8 h-5 rounded-l-full border border-slate-500 bg-slate-800 -mr-4"></div>
+                <!-- Cap top -->
+                <div class="absolute top-1 left-1/2 -translate-x-1/2 w-12 h-3 rounded-full border border-slate-500 bg-slate-900"></div>
+              </div>
+
+              <!-- Pump indicator -->
+              <div class="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+                <div class="w-0.5 h-5 bg-gradient-to-b from-transparent to-slate-600"></div>
+                <div id="pump-visual" class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-600 bg-slate-900 text-xl shadow-inner transition-all duration-500">
+                  ⚙
+                </div>
+                <div class="section-label mt-0.5 text-center" id="pump-visual-label">PUMP IDLE</div>
+              </div>
+            </div>
+
+            <!-- Right: Process Status + Alarm window (compact) -->
+            <div class="flex flex-col gap-2 w-36">
+              <div class="kpi-card p-2.5 space-y-1.5">
+                <div class="section-label">Process Status</div>
+                <div class="space-y-1 text-[11px]">
+                  <div class="flex justify-between"><span class="text-slate-500">Flow</span><span class="font-semibold text-slate-300 uppercase" id="ps-flow">IDLE</span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Pump</span><span class="font-semibold text-slate-300 uppercase" id="ps-pump">STOPPED</span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Inlet</span><span class="font-semibold uppercase" id="ps-inlet">CLOSED</span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Outlet</span><span class="font-semibold uppercase" id="ps-outlet">CLOSED</span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Mode</span><span class="font-semibold text-emerald-400 uppercase" id="ps-mode">AUTO</span></div>
+                </div>
+              </div>
+              <div class="kpi-card p-2.5 space-y-1">
+                <div class="section-label">Alarms</div>
+                <div id="alarm-window" class="space-y-1 text-[10px]">
+                  <div class="rounded bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-1 text-emerald-300">✓ Clear</div>
+                </div>
+              </div>
+              <div class="kpi-card p-2.5 flex-1">
+                <div class="section-label mb-1">Level Trend</div>
+                <canvas id="miniChart" class="w-full" height="60"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- RIGHT: Operator Controls -->
+      <aside class="panel p-5 space-y-5">
+        <div>
+          <div class="section-label">Operator Controls</div>
+          <h2 class="text-lg font-bold text-white mt-0.5">Process Commands</h2>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid gap-2">
+          <button class="btn btn-start w-full" onclick="doCommand('start')">▶ Start Filling</button>
+          <button class="btn btn-stop w-full" onclick="doCommand('stop')">⏹ Stop Process</button>
+          <button class="btn btn-reset w-full" onclick="doCommand('reset')">↺ Reset Simulation</button>
+          <button class="btn btn-danger w-full" onclick="doCommand('drain')">⬇ Drain Tank</button>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="kpi-card space-y-3">
+          <div class="section-label">Operating Mode</div>
+          <div class="flex gap-2">
+            <button id="btn-auto" class="btn btn-save flex-1 btn-sm" onclick="setMode('auto')">AUTO</button>
+            <button id="btn-manual" class="btn btn-slate flex-1 btn-sm" onclick="setMode('manual')">MANUAL</button>
+          </div>
+        </div>
+
+        <!-- Simulation sliders -->
+        <div class="kpi-card space-y-4">
+          <div class="section-label">Simulation Parameters</div>
+          <label class="block">
+            <span class="form-label">Fill Speed</span>
+            <input type="range" min="0" max="10" value="5" id="sl-fill" oninput="updateRange('fill')">
+            <div class="flex justify-between mt-1 text-[10px] text-slate-600"><span>0</span><span class="range-val" id="rv-fill">5</span><span>10</span></div>
+          </label>
+          <label class="block">
+            <span class="form-label">Drain Speed</span>
+            <input type="range" min="0" max="10" value="4" id="sl-drain" oninput="updateRange('drain')">
+            <div class="flex justify-between mt-1 text-[10px] text-slate-600"><span>0</span><span class="range-val" id="rv-drain">4</span><span>10</span></div>
+          </label>
+          <label class="block">
+            <span class="form-label">Sim Speed Multiplier</span>
+            <input type="range" min="0.5" max="5" step="0.5" value="1" id="sl-speed" oninput="updateRange('speed')">
+            <div class="flex justify-between mt-1 text-[10px] text-slate-600"><span>0.5×</span><span class="range-val" id="rv-speed">1.0×</span><span>5×</span></div>
+          </label>
+        </div>
+
+        <!-- Alarm thresholds quick view -->
+        <div class="kpi-card space-y-2">
+          <div class="section-label">Alarm Thresholds</div>
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div class="flex justify-between"><span class="text-red-400 font-bold">LLLL</span><span class="mono text-slate-300">5%</span></div>
+            <div class="flex justify-between"><span class="text-amber-400 font-semibold">Low</span><span class="mono text-slate-300">15%</span></div>
+            <div class="flex justify-between"><span class="text-amber-400 font-semibold">High</span><span class="mono text-slate-300">80%</span></div>
+            <div class="flex justify-between"><span class="text-red-400 font-bold">HHHH</span><span class="mono text-slate-300">95%</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Bottom: Compact charts + event log side by side -->
+    <section class="grid gap-3 xl:grid-cols-[1fr_380px]">
+      <!-- 4 mini charts -->
+      <div class="panel p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="section-label">Live Process Trends</div>
+          <div class="led led-cyan text-[10px]">Live</div>
+        </div>
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-2">
+          <div>
+            <div class="section-label mb-1 text-cyan-600">Level %</div>
+            <div class="h-28 rounded-lg bg-slate-950/60 border border-slate-800 p-1.5"><canvas id="levelChart"></canvas></div>
+          </div>
+          <div>
+            <div class="section-label mb-1 text-emerald-600">Pressure bar</div>
+            <div class="h-28 rounded-lg bg-slate-950/60 border border-slate-800 p-1.5"><canvas id="pressureChart"></canvas></div>
+          </div>
+          <div>
+            <div class="section-label mb-1 text-amber-600">Temp °C</div>
+            <div class="h-28 rounded-lg bg-slate-950/60 border border-slate-800 p-1.5"><canvas id="temperatureChart"></canvas></div>
+          </div>
+          <div>
+            <div class="section-label mb-1 text-blue-600">Flow L/min</div>
+            <div class="h-28 rounded-lg bg-slate-950/60 border border-slate-800 p-1.5"><canvas id="flowChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <!-- Event Log compact -->
+      <div class="panel p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <div class="section-label">Event Log</div>
+          <button class="btn btn-slate btn-sm" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="space-y-1 overflow-y-auto flex-1 pr-0.5" id="event-log" style="max-height:140px;">
+          <div class="event-row flex items-start gap-2 rounded-lg border border-slate-800/50 bg-slate-950/40 px-2 py-1.5">
+            <span class="mono text-[9px] text-slate-600 mt-0.5 whitespace-nowrap">19:50:00</span>
+            <span class="text-[11px] text-slate-300">System initialized — Simulation ready</span>
+          </div>
+          <div class="event-row flex items-start gap-2 rounded-lg border border-slate-800/50 bg-slate-950/40 px-2 py-1.5">
+            <span class="mono text-[9px] text-slate-600 mt-0.5 whitespace-nowrap">19:50:01</span>
+            <span class="text-[11px] text-slate-300">Default operator account loaded</span>
+          </div>
+          <div class="event-row flex items-start gap-2 rounded-lg border border-slate-800/50 bg-slate-950/40 px-2 py-1.5">
+            <span class="mono text-[9px] text-slate-600 mt-0.5 whitespace-nowrap">19:50:02</span>
+            <span class="text-[11px] text-slate-300">Simulation engine ready for commands</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
+
+
+  <!-- ===================== ALARMS ===================== -->
+  <div id="page-alarms" class="page space-y-4">
+    <div class="panel p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <div class="section-label">Alarm Console</div>
+          <h2 class="text-xl font-bold text-white">Active & Historical Alarms</h2>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-slate btn-sm" onclick="ackAll()">Acknowledge All</button>
+          <button class="btn btn-slate btn-sm" onclick="clearAlarms()">Clear All</button>
+        </div>
+      </div>
+
+      <!-- Alarm summary KPIs -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Critical</div>
+          <div class="text-2xl font-black text-red-400 mono" id="alarm-critical-cnt">0</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">High</div>
+          <div class="text-2xl font-black text-amber-400 mono" id="alarm-high-cnt">0</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Medium</div>
+          <div class="text-2xl font-black text-yellow-400 mono" id="alarm-med-cnt">0</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Low</div>
+          <div class="text-2xl font-black text-indigo-400 mono" id="alarm-low-cnt">0</div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Alarm Tag</th>
+              <th>Description</th>
+              <th>Triggered</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="alarm-table">
+            <tr>
+              <td colspan="6" class="text-center text-slate-600 py-8">✓ No active alarms</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===================== REPORTS ===================== -->
+  <div id="page-reports" class="page space-y-4">
+    <div class="panel p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <div class="section-label">Reports Hub</div>
+          <h2 class="text-xl font-bold text-white">Data Export & Analytics</h2>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button class="btn btn-slate btn-sm" onclick="exportData('events','csv')">⬇ Events CSV</button>
+          <button class="btn btn-slate btn-sm" onclick="exportData('alarms','csv')">⬇ Alarms CSV</button>
+          <button class="btn btn-slate btn-sm" onclick="exportData('trends','json')">⬇ Trends JSON</button>
+        </div>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Total Events</div>
+          <div class="text-2xl font-black text-white mono">24</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Alarms Fired</div>
+          <div class="text-2xl font-black text-amber-400 mono">3</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Pump Run Hours</div>
+          <div class="text-2xl font-black text-cyan-400 mono">128.4</div>
+        </div>
+        <div class="kpi-card text-center">
+          <div class="section-label mb-1">Energy Used</div>
+          <div class="text-2xl font-black text-emerald-400 mono">214.6 kWh</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid xl:grid-cols-2 gap-4 mb-5">
+        <div class="kpi-card">
+          <div class="section-label mb-2">24h Tank Level History</div>
+          <div class="h-52"><canvas id="reportLevelChart"></canvas></div>
+        </div>
+        <div class="kpi-card">
+          <div class="section-label mb-2">Alarm Frequency by Severity</div>
+          <div class="h-52 flex items-center justify-center"><canvas id="reportAlarmChart" style="max-height:200px;"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Recent events table -->
+      <div>
+        <div class="section-label mb-2">Recent Operator Events</div>
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Event</th><th>Operator</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono text-slate-500 text-[11px]">2026-07-21 19:50:00</td><td>System Init</td><td>System</td><td class="text-slate-500">Simulation ready</td></tr>
+              <tr><td class="mono text-slate-500 text-[11px]">2026-07-21 19:50:01</td><td>Operator Login</td><td>Sim. Op.</td><td class="text-slate-500">Default operator loaded</td></tr>
+              <tr><td class="mono text-slate-500 text-[11px]">2026-07-21 19:50:02</td><td>Engine Ready</td><td>System</td><td class="text-slate-500">Engine accepting commands</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===================== SETTINGS ===================== -->
+  <div id="page-settings" class="page space-y-4">
+    <div class="panel p-5">
+      <div class="mb-5">
+        <div class="section-label">Configuration</div>
+        <h2 class="text-xl font-bold text-white">Simulation & Alarm Settings</h2>
+      </div>
+
+      <div class="grid xl:grid-cols-2 gap-6">
+
+        <!-- Tank Settings -->
+        <div class="space-y-4">
+          <div class="section-label text-cyan-700 border-b border-slate-800 pb-1">Tank Configuration</div>
+          <div>
+            <label class="form-label">Tank Capacity (Liters)</label>
+            <input type="number" class="form-input" value="1000" min="100" max="50000" id="cfg-capacity">
+          </div>
+          <div>
+            <label class="form-label">Simulation Speed Multiplier</label>
+            <input type="range" min="0.5" max="5" step="0.5" value="1" id="cfg-speed" oninput="document.getElementById('cfg-speed-val').textContent=this.value+'×'">
+            <div class="flex justify-between mt-1 text-[10px] text-slate-600"><span>0.5×</span><span class="range-val" id="cfg-speed-val">1.0×</span><span>5×</span></div>
+          </div>
+          <div>
+            <label class="form-label">Unit System</label>
+            <select class="form-select" id="cfg-units">
+              <option value="metric" selected>Metric (L, bar, °C)</option>
+              <option value="imperial">Imperial (gal, psi, °F)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Sensor Noise Factor (0 = perfect, 1 = noisy)</label>
+            <input type="range" min="0" max="1" step="0.05" value="0.05" id="cfg-noise" oninput="document.getElementById('cfg-noise-val').textContent=this.value">
+            <div class="flex justify-between mt-1 text-[10px] text-slate-600"><span>0</span><span class="range-val" id="cfg-noise-val">0.05</span><span>1</span></div>
+          </div>
+        </div>
+
+        <!-- Alarm Thresholds -->
+        <div class="space-y-4">
+          <div class="section-label text-amber-700 border-b border-slate-800 pb-1">Alarm Thresholds (%)</div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="form-label text-red-500">LLLL — Critical Low (%)</label>
+              <input type="number" class="form-input border-red-500/30" value="5" min="0" max="100" id="cfg-llll">
+            </div>
+            <div>
+              <label class="form-label text-amber-500">Low — Warning Low (%)</label>
+              <input type="number" class="form-input border-amber-500/30" value="15" min="0" max="100" id="cfg-low">
+            </div>
+            <div>
+              <label class="form-label text-amber-500">High — Warning High (%)</label>
+              <input type="number" class="form-input border-amber-500/30" value="80" min="0" max="100" id="cfg-high">
+            </div>
+            <div>
+              <label class="form-label text-red-500">HHHH — Critical High (%)</label>
+              <input type="number" class="form-input border-red-500/30" value="95" min="0" max="100" id="cfg-hhhh">
+            </div>
+          </div>
+
+          <!-- Threshold visual bar -->
+          <div class="space-y-2 mt-2">
+            <div class="section-label">Threshold Preview</div>
+            <div class="relative h-6 rounded-full overflow-hidden bg-slate-900 border border-slate-800">
+              <div class="absolute inset-y-0 left-0 bg-red-500/40" style="width:5%"></div>
+              <div class="absolute inset-y-0 bg-amber-400/30" style="left:5%; width:10%"></div>
+              <div class="absolute inset-y-0 bg-emerald-500/30" style="left:15%; width:65%"></div>
+              <div class="absolute inset-y-0 bg-amber-400/30" style="left:80%; width:15%"></div>
+              <div class="absolute inset-y-0 right-0 bg-red-500/40" style="width:5%"></div>
+              <div class="absolute inset-0 flex items-center justify-center text-[10px] text-white font-semibold tracking-widest">LLLL — LOW — NORMAL — HIGH — HHHH</div>
+            </div>
+          </div>
+
+          <!-- Temperature & Pressure ranges -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <label class="form-label">Min Temperature (°C)</label>
+              <input type="number" class="form-input" value="15" id="cfg-temp-min">
+            </div>
+            <div>
+              <label class="form-label">Max Temperature (°C)</label>
+              <input type="number" class="form-input" value="85" id="cfg-temp-max">
+            </div>
+            <div>
+              <label class="form-label">Min Pressure (bar)</label>
+              <input type="number" class="form-input" value="0.5" step="0.1" id="cfg-pres-min">
+            </div>
+            <div>
+              <label class="form-label">Max Pressure (bar)</label>
+              <input type="number" class="form-input" value="8" step="0.1" id="cfg-pres-max">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6 pt-4 border-t border-slate-800">
+        <button class="btn btn-save" onclick="saveSettings()">💾 Save Configuration</button>
+        <button class="btn btn-slate" onclick="resetSettings()">↺ Reset Defaults</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===================== USERS ===================== -->
+  <div id="page-users" class="page space-y-4">
+    <div class="panel p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <div class="section-label">Access Management</div>
+          <h2 class="text-xl font-bold text-white">Operator & Admin Accounts</h2>
+        </div>
+        <button class="btn btn-save" onclick="toggleUserForm()">+ Add Operator</button>
+      </div>
+
+      <!-- Add user form (hidden by default) -->
+      <div id="user-form" class="hidden mb-5 kpi-card space-y-4">
+        <div class="section-label text-violet-600 border-b border-slate-800 pb-1">Create New Account</div>
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div>
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" placeholder="John Smith" id="new-name">
+          </div>
+          <div>
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-input" placeholder="user@scada.local" id="new-email">
+          </div>
+          <div>
+            <label class="form-label">Password</label>
+            <input type="password" class="form-input" placeholder="••••••••" id="new-password">
+          </div>
+          <div>
+            <label class="form-label">Role</label>
+            <select class="form-select" id="new-role">
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+              <option value="readonly">Read-Only</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-save btn-sm" onclick="addUser()">Create Account</button>
+          <button class="btn btn-slate btn-sm" onclick="toggleUserForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Users table -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="user-table">
+            <tr>
+              <td class="font-semibold text-white">Simulation Operator</td>
+              <td class="mono text-xs text-slate-400">operator@scada.local</td>
+              <td><span class="badge badge-medium">Operator</span></td>
+              <td><span class="led led-green" style="animation:none">ACTIVE</span></td>
+              <td class="mono text-xs text-slate-500">Just now</td>
+              <td><button class="btn btn-slate btn-sm" onclick="removeUser(this,'Simulation Operator')">Remove</button></td>
+            </tr>
+            <tr>
+              <td class="font-semibold text-white">System Admin</td>
+              <td class="mono text-xs text-slate-400">admin@scada.local</td>
+              <td><span class="badge badge-critical">Admin</span></td>
+              <td><span class="led led-green" style="animation:none">ACTIVE</span></td>
+              <td class="mono text-xs text-slate-500">2026-07-21 18:00</td>
+              <td><button class="btn btn-slate btn-sm" onclick="removeUser(this,'System Admin')">Remove</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrapper -->
+
+
+<script>
+// =====================================================
+// STATE
+// =====================================================
+let simState = {
+  process: 'idle',
+  mode: 'auto',
+  level: 35.0,
+  volume: 350,
+  pressure: 1.80,
+  temperature: 27.3,
+  flow: 18.4,
+  energy: 214.6,
+  pumpState: 'stopped',
+  inletValve: 'closed',
+  outletValve: 'closed',
+  motorCurrent: 7.2,
+  motorTemp: 47.8,
+  efficiency: 86.1,
+  runHours: 128.4,
+  fillSpeed: 5,
+  drainSpeed: 4,
+  simSpeed: 1,
+};
+
+const alarms = [];
+let levelHistory = Array.from({length:60}, (_,i) => 35 + (Math.random()-0.5)*2);
+
+// =====================================================
+// PAGE NAV
+// =====================================================
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// =====================================================
+// SIMULATION TICK
+// =====================================================
+function tick() {
+  const dt = 0.1 * simState.simSpeed;
+  if (simState.process === 'filling') {
+    simState.level = Math.min(100, simState.level + simState.fillSpeed * dt * 0.2);
+  } else if (simState.process === 'draining') {
+    simState.level = Math.max(0, simState.level - simState.drainSpeed * dt * 0.2);
+  }
+  // Add sensor noise
+  simState.volume = Math.round(simState.level * 10);
+  simState.pressure = +(1.5 + (simState.level / 100) * 3 + (Math.random()-0.5)*0.05).toFixed(2);
+  simState.temperature = +(27 + simState.level * 0.1 + (Math.random()-0.5)*0.3).toFixed(1);
+  simState.flow = simState.process === 'filling' ? +(15 + simState.fillSpeed * 1.2 + (Math.random()-0.5)*1.5).toFixed(1)
+                : simState.process === 'draining' ? +(-(8 + simState.drainSpeed * 0.8)).toFixed(1)
+                : 0;
+  if (simState.pumpState === 'running') {
+    simState.motorCurrent = +(6 + simState.fillSpeed * 0.5 + (Math.random()-0.5)*0.5).toFixed(1);
+    simState.motorTemp = +(40 + simState.fillSpeed * 2 + (Math.random()-0.5)*0.8).toFixed(1);
+    simState.runHours = +(simState.runHours + dt / 3600).toFixed(2);
+    simState.energy = +(simState.energy + simState.motorCurrent * 0.4 * dt / 3600).toFixed(2);
+  } else {
+    simState.motorCurrent = +(0.3 + (Math.random()-0.5)*0.1).toFixed(1);
+    simState.motorTemp = Math.max(25, +(simState.motorTemp - dt * 0.05 + (Math.random()-0.5)*0.05).toFixed(1));
+  }
+  simState.efficiency = +(82 + (Math.random()-0.5)*4).toFixed(1);
+
+  // Auto stop at limits
+  if (simState.level >= 99.9 && simState.process === 'filling') { doCommand('stop'); }
+  if (simState.level <= 0.1  && simState.process === 'draining') { doCommand('stop'); }
+
+  checkAlarms();
+  updateUI();
+}
+
+setInterval(tick, 500);
+
+// =====================================================
+// ALARMS
+// =====================================================
+function checkAlarms() {
+  const l = simState.level;
+  const now = new Date().toLocaleTimeString('en-GB');
+  const existing = alarms.map(a => a.tag);
+
+  const checks = [
+    { tag:'LLLL_LVL', sev:'critical', desc:'Tank level critically low (LLLL)', trigger: l <= 5 },
+    { tag:'LOW_LVL',  sev:'high',     desc:'Tank level low',                  trigger: l >5  && l <= 15 },
+    { tag:'HIGH_LVL', sev:'high',     desc:'Tank level high',                 trigger: l >= 80 && l < 95 },
+    { tag:'HHHH_LVL', sev:'critical', desc:'Tank level critically high (HHHH)',trigger: l >= 95 },
+  ];
+
+  checks.forEach(c => {
+    if (c.trigger && !existing.includes(c.tag)) {
+      alarms.push({ tag: c.tag, severity: c.sev, description: c.desc, time: now, status:'active' });
+    } else if (!c.trigger) {
+      const idx = alarms.findIndex(a => a.tag === c.tag);
+      if (idx !== -1 && alarms[idx].status === 'active') alarms.splice(idx, 1);
+    }
+  });
+
+  updateAlarmBadge();
+  updateAlarmTable();
+  updateAlarmWindow();
+}
+
+function updateAlarmBadge() {
+  const active = alarms.filter(a=>a.status==='active').length;
+  const badge = document.getElementById('alarm-badge');
+  badge.textContent = active;
+  badge.classList.toggle('hidden', active === 0);
+}
+
+function updateAlarmWindow() {
+  const win = document.getElementById('alarm-window');
+  if (!alarms.length) {
+    win.innerHTML = '<div class="rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-2 py-1.5 text-emerald-300 text-xs">✓ No active alarms</div>';
+    return;
+  }
+  win.innerHTML = alarms.slice(-3).map(a => `<div class="rounded-lg bg-red-500/10 border border-red-500/25 px-2 py-1.5 text-red-300 text-[10px]">⚠ ${a.description}</div>`).join('');
+}
+
+function updateAlarmTable() {
+  const tbody = document.getElementById('alarm-table');
+  const counts = {critical:0, high:0, medium:0, low:0};
+  alarms.forEach(a => { if(counts[a.severity]!==undefined) counts[a.severity]++; });
+  document.getElementById('alarm-critical-cnt').textContent = counts.critical;
+  document.getElementById('alarm-high-cnt').textContent     = counts.high;
+  document.getElementById('alarm-med-cnt').textContent      = counts.medium;
+  document.getElementById('alarm-low-cnt').textContent      = counts.low;
+
+  if (!alarms.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-slate-600 py-8">✓ No active alarms</td></tr>';
+    return;
+  }
+  tbody.innerHTML = alarms.map((a,i) => `
+    <tr>
+      <td><span class="badge badge-${a.severity}">${a.severity.toUpperCase()}</span></td>
+      <td class="mono text-xs">${a.tag}</td>
+      <td class="text-slate-300">${a.description}</td>
+      <td class="mono text-xs text-slate-500">${a.time}</td>
+      <td><span class="led led-${a.status==='acknowledged'?'amber':'red'}" style="font-size:10px">${a.status.toUpperCase()}</span></td>
+      <td class="flex gap-1">
+        <button class="btn btn-slate btn-sm" onclick="ackAlarm(${i})">Ack</button>
+        <button class="btn btn-slate btn-sm" onclick="clearAlarm(${i})">Clear</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function ackAlarm(i) { if(alarms[i]) { alarms[i].status='acknowledged'; updateAlarmTable(); toast('Alarm acknowledged'); } }
+function clearAlarm(i) { if(alarms[i]) { alarms.splice(i,1); updateAlarmTable(); updateAlarmBadge(); updateAlarmWindow(); toast('Alarm cleared'); } }
+function ackAll() { alarms.forEach(a=>a.status='acknowledged'); updateAlarmTable(); toast('All alarms acknowledged'); }
+function clearAlarms() { alarms.length=0; updateAlarmTable(); updateAlarmBadge(); updateAlarmWindow(); toast('All alarms cleared'); }
+
+// =====================================================
+// COMMANDS
+// =====================================================
+function doCommand(cmd) {
+  const t = new Date().toLocaleTimeString('en-GB');
+  const msgs = {
+    start:  'Pump started — Filling mode',
+    stop:   'Process stopped',
+    reset:  'Simulation reset',
+    drain:  'Drain initiated',
+  };
+  switch(cmd) {
+    case 'start':
+      simState.process = 'filling';
+      simState.pumpState = 'running';
+      simState.inletValve = 'open';
+      simState.outletValve = 'closed';
+      break;
+    case 'stop':
+      simState.process = 'idle';
+      simState.pumpState = 'stopped';
+      simState.inletValve = 'closed';
+      simState.outletValve = 'closed';
+      break;
+    case 'reset':
+      simState.level = 35;
+      simState.process = 'idle';
+      simState.pumpState = 'stopped';
+      simState.inletValve = 'closed';
+      simState.outletValve = 'closed';
+      alarms.length = 0;
+      levelHistory = Array.from({length:60}, () => 35 + (Math.random()-0.5)*2);
+      updateAlarmBadge();
+      updateAlarmTable();
+      break;
+    case 'drain':
+      simState.process = 'draining';
+      simState.pumpState = 'stopped';
+      simState.inletValve = 'closed';
+      simState.outletValve = 'open';
+      break;
+  }
+  addEvent(t, msgs[cmd] || cmd, 'Sim. Op.');
+  toast(msgs[cmd] || cmd);
+}
+
+function setMode(m) {
+  simState.mode = m;
+  document.getElementById('btn-auto').className   = 'btn flex-1 btn-sm ' + (m==='auto'   ? 'btn-save'  : 'btn-slate');
+  document.getElementById('btn-manual').className = 'btn flex-1 btn-sm ' + (m==='manual' ? 'btn-save'  : 'btn-slate');
+  document.getElementById('mode-led').className   = 'led ' + (m==='auto' ? 'led-green' : 'led-amber');
+  document.getElementById('mode-led').textContent = m.toUpperCase();
+  document.getElementById('ps-mode').textContent  = m.toUpperCase();
+  document.getElementById('ps-mode').className    = 'font-semibold uppercase ' + (m==='auto' ? 'text-emerald-400' : 'text-amber-400');
+  toast('Mode set to ' + m.toUpperCase());
+  addEvent(new Date().toLocaleTimeString('en-GB'), 'Mode changed to ' + m.toUpperCase(), 'Sim. Op.');
+}
+
+// =====================================================
+// UI UPDATE
+// =====================================================
+function updateUI() {
+  const s = simState;
+  const l = s.level;
+  levelHistory.push(l);
+  if (levelHistory.length > 60) levelHistory.shift();
+
+  // KPIs
+  document.getElementById('kpi-level').textContent     = l.toFixed(1);
+  document.getElementById('kpi-level-bar').style.width = l + '%';
+  document.getElementById('kpi-volume').textContent    = s.volume;
+  document.getElementById('kpi-pressure').textContent  = s.pressure;
+  document.getElementById('kpi-temp').textContent      = s.temperature;
+  document.getElementById('kpi-flow').textContent      = Math.abs(s.flow).toFixed(1);
+  document.getElementById('kpi-energy').textContent    = s.energy;
+
+  // Info panel
+  document.getElementById('info-level').textContent = l.toFixed(1) + ' %';
+  document.getElementById('info-vol').textContent   = s.volume + ' L';
+  document.getElementById('info-temp').textContent  = s.temperature + ' °C';
+  document.getElementById('info-pres').textContent  = s.pressure + ' bar';
+  document.getElementById('info-flow').textContent  = s.flow + ' L/min';
+  document.getElementById('info-current').textContent = s.motorCurrent + ' A';
+  document.getElementById('info-mtemp').textContent   = s.motorTemp + ' °C';
+  document.getElementById('info-eff').textContent     = s.efficiency + ' %';
+  document.getElementById('info-hours').textContent   = s.runHours + ' h';
+
+  // Pump badge
+  const pumpBadge = document.getElementById('pump-state-badge');
+  pumpBadge.textContent  = s.pumpState.toUpperCase();
+  pumpBadge.className    = 'led ' + (s.pumpState==='running' ? 'led-green' : 'led-slate');
+
+  // Valves
+  const vi = document.getElementById('valve-inlet');
+  vi.textContent = s.inletValve.toUpperCase();
+  vi.className   = 'font-bold text-sm ' + (s.inletValve==='open' ? 'valve-open' : 'valve-closed');
+  const vo = document.getElementById('valve-outlet');
+  vo.textContent = s.outletValve.toUpperCase();
+  vo.className   = 'font-bold text-sm ' + (s.outletValve==='open' ? 'valve-open' : 'valve-closed');
+
+  // Process status
+  document.getElementById('ps-flow').textContent   = s.process.toUpperCase();
+  document.getElementById('ps-pump').textContent   = s.pumpState.toUpperCase();
+  const psIn = document.getElementById('ps-inlet');
+  psIn.textContent = s.inletValve.toUpperCase();
+  psIn.className   = 'font-semibold uppercase ' + (s.inletValve==='open' ? 'text-emerald-400' : 'text-slate-500');
+  const psOut = document.getElementById('ps-outlet');
+  psOut.textContent = s.outletValve.toUpperCase();
+  psOut.className   = 'font-semibold uppercase ' + (s.outletValve==='open' ? 'text-emerald-400' : 'text-slate-500');
+
+  // Tank fill
+  const fill = document.getElementById('tank-fill');
+  fill.style.height = l + '%';
+  const pct = l < 15 ? 'from-amber-500 via-amber-400 to-yellow-300'
+             : l > 80 ? 'from-red-600 via-red-500 to-orange-400'
+             : 'from-cyan-500 via-sky-400 to-cyan-300';
+  fill.querySelector('div.absolute.inset-0.top-4').className = `absolute inset-0 top-4 bg-gradient-to-b ${pct.replace('from','from').replace('via','via').replace('to','to')} opacity-80`;
+
+  document.getElementById('tank-pct').textContent    = l.toFixed(1) + '%';
+  document.getElementById('tank-liters').textContent = s.volume + ' L / 1000 L';
+
+  // Pump visual
+  const pv = document.getElementById('pump-visual');
+  if (s.pumpState === 'running') {
+    pv.style.borderColor = '#22d3ee';
+    pv.style.boxShadow   = '0 0 16px rgba(6,182,212,0.5)';
+    pv.style.animation   = 'spin 1s linear infinite';
+  } else {
+    pv.style.borderColor = '';
+    pv.style.boxShadow   = '';
+    pv.style.animation   = '';
+  }
+  document.getElementById('pump-visual-label').textContent = 'PUMP ' + s.pumpState.toUpperCase();
+
+  // Mini chart
+  if (miniChartRef) {
+    miniChartRef.data.datasets[0].data = levelHistory;
+    miniChartRef.update('none');
+  }
+
+  // Main charts
+  updateCharts(s);
+}
+
+// =====================================================
+// CHARTS
+// =====================================================
+const chartDefaults = {
+  borderWidth: 1.5,
+  tension: 0.35,
+  fill: true,
+  pointRadius: 0,
+};
+
+function makeChart(id, label, color, initialData) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 160);
+  gradient.addColorStop(0, color + '40');
+  gradient.addColorStop(1, color + '00');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array.from({length:30}, (_,i) => (30-i)+'m'),
+      datasets: [{ label, data: initialData, borderColor: color, backgroundColor: gradient, ...chartDefaults }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color:'rgba(148,163,184,0.07)' }, ticks:{ color:'#475569', font:{size:9} } },
+        y: { grid: { color:'rgba(148,163,184,0.07)' }, ticks:{ color:'#475569', font:{size:9} } }
+      }
+    }
+  });
+}
+
+const rand = (base, range, n=30) => Array.from({length:n}, () => +(base + (Math.random()-0.5)*range).toFixed(2));
+
+const charts = {
+  level:       makeChart('levelChart',       'Tank Level (%)',      '#38bdf8', rand(35,3)),
+  pressure:    makeChart('pressureChart',    'Pressure (bar)',      '#22c55e', rand(1.8,0.3)),
+  temperature: makeChart('temperatureChart', 'Temperature (°C)',    '#facc15', rand(27.3,1.5)),
+  flow:        makeChart('flowChart',        'Flow Rate (L/min)',   '#60a5fa', rand(18.4,3)),
+};
+
+function updateCharts(s) {
+  const push = (chart, val) => {
+    chart.data.datasets[0].data.push(val);
+    if (chart.data.datasets[0].data.length > 30) chart.data.datasets[0].data.shift();
+    chart.update('none');
+  };
+  push(charts.level,       +s.level.toFixed(1));
+  push(charts.pressure,    s.pressure);
+  push(charts.temperature, s.temperature);
+  push(charts.flow,        +Math.abs(s.flow).toFixed(1));
+}
+
+// Mini chart
+let miniChartRef;
+{
+  const ctx = document.getElementById('miniChart').getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,70);
+  g.addColorStop(0,'rgba(56,189,248,0.3)'); g.addColorStop(1,'rgba(56,189,248,0)');
+  miniChartRef = new Chart(ctx, {
+    type:'line',
+    data: { labels:Array.from({length:60},(_,i)=>i), datasets:[{data:levelHistory, borderColor:'#38bdf8', backgroundColor:g, borderWidth:1.2, tension:0.3, fill:true, pointRadius:0}]},
+    options: { responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}}, scales:{ x:{display:false}, y:{display:false} } }
+  });
+}
+
+// Report charts
+{
+  const ctx = document.getElementById('reportLevelChart').getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,200);
+  g.addColorStop(0,'rgba(56,189,248,0.25)'); g.addColorStop(1,'rgba(56,189,248,0)');
+  new Chart(ctx, {
+    type:'line',
+    data: { labels:Array.from({length:24},(_,i)=>i+'h'), datasets:[{label:'Level %', data:rand(50,30,24), borderColor:'#38bdf8', backgroundColor:g, ...chartDefaults }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(148,163,184,0.07)'},ticks:{color:'#475569'}}, y:{grid:{color:'rgba(148,163,184,0.07)'},ticks:{color:'#475569'}} } }
+  });
+  new Chart(document.getElementById('reportAlarmChart').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Critical','High','Medium','Low'], datasets:[{data:[2,5,8,3], backgroundColor:['rgba(239,68,68,0.7)','rgba(245,158,11,0.7)','rgba(234,179,8,0.7)','rgba(99,102,241,0.7)'], borderColor:['#ef4444','#f59e0b','#eab308','#6366f1'], borderWidth:1.5 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#64748b', font:{size:11} } } } }
+  });
+}
+
+// =====================================================
+// RANGE SLIDERS
+// =====================================================
+function updateRange(type) {
+  if (type === 'fill')  { simState.fillSpeed  = +document.getElementById('sl-fill').value;  document.getElementById('rv-fill').textContent  = simState.fillSpeed; }
+  if (type === 'drain') { simState.drainSpeed = +document.getElementById('sl-drain').value; document.getElementById('rv-drain').textContent = simState.drainSpeed; }
+  if (type === 'speed') { simState.simSpeed   = +document.getElementById('sl-speed').value; document.getElementById('rv-speed').textContent = simState.simSpeed + '×'; }
+}
+
+// =====================================================
+// SETTINGS
+// =====================================================
+function saveSettings() {
+  toast('✓ Configuration saved successfully');
+  addEvent(new Date().toLocaleTimeString('en-GB'), 'Settings updated by operator', 'Sim. Op.');
+}
+function resetSettings() {
+  ['cfg-capacity','cfg-llll','cfg-low','cfg-high','cfg-hhhh','cfg-temp-min','cfg-temp-max','cfg-pres-min','cfg-pres-max']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.value = el.defaultValue; });
+  document.getElementById('cfg-speed').value = 1;
+  document.getElementById('cfg-speed-val').textContent = '1.0×';
+  document.getElementById('cfg-noise').value = 0.05;
+  document.getElementById('cfg-noise-val').textContent = '0.05';
+  toast('Settings reset to defaults');
+}
+
+// =====================================================
+// USERS
+// =====================================================
+function toggleUserForm() {
+  const f = document.getElementById('user-form');
+  f.classList.toggle('hidden');
+}
+function addUser() {
+  const name  = document.getElementById('new-name').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const role  = document.getElementById('new-role').value;
+  if (!name || !email) { toast('Please fill all fields'); return; }
+  const tbody = document.getElementById('user-table');
+  const badgeClass = role==='admin' ? 'badge-critical' : role==='readonly' ? 'badge-low' : 'badge-medium';
+  const now = new Date().toLocaleTimeString('en-GB');
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td class="font-semibold text-white">${name}</td>
+      <td class="mono text-xs text-slate-400">${email}</td>
+      <td><span class="badge ${badgeClass}">${role.charAt(0).toUpperCase()+role.slice(1)}</span></td>
+      <td><span class="led led-green" style="animation:none">ACTIVE</span></td>
+      <td class="mono text-xs text-slate-500">Just now</td>
+      <td><button class="btn btn-slate btn-sm" onclick="removeUser(this,'${name}')">Remove</button></td>
+    </tr>
+  `);
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-email').value = '';
+  toggleUserForm();
+  toast('Account created: ' + name);
+  addEvent(now, 'Operator account created: ' + name, 'Admin');
+}
+function removeUser(btn, name) {
+  if (!confirm('Remove account: ' + name + '?')) return;
+  btn.closest('tr').remove();
+  toast('Account removed: ' + name);
+  addEvent(new Date().toLocaleTimeString('en-GB'), 'Operator account removed: ' + name, 'Admin');
+}
+
+// =====================================================
+// EXPORT (mock)
+// =====================================================
+function exportData(type, format) {
+  toast('⬇ Downloading ' + type + '.' + format + '...');
+}
+
+// =====================================================
+// EVENT LOG
+// =====================================================
+function addEvent(time, msg, op) {
+  const log = document.getElementById('event-log');
+  const row = document.createElement('div');
+  row.className = 'event-row flex items-start gap-3 rounded-xl border border-slate-800/60 bg-slate-950/50 px-3 py-2.5';
+  row.innerHTML = `<span class="mono text-[10px] text-slate-600 mt-0.5 whitespace-nowrap">${time}</span><span class="text-xs text-slate-300 flex-1">${msg}</span><span class="text-[10px] text-slate-600">${op}</span>`;
+  log.prepend(row);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+function clearLog() {
+  document.getElementById('event-log').innerHTML = '';
+  toast('Log cleared');
+}
+
+// =====================================================
+// CLOCK
+// =====================================================
+function updateTime() {
+  const t = new Date().toLocaleTimeString('en-GB');
+  document.getElementById('hdr-time').textContent = t;
+  const d = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// =====================================================
+// TOAST
+// =====================================================
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = '✓ ' + msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// =====================================================
+// CSS spin keyframe (for pump)
+// =====================================================
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }';
+document.head.appendChild(style);
+</script>
+</body>
+</html>

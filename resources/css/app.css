@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    color-scheme: dark;
+}
+
+@layer base {
+    body {
+        @apply bg-slate-950 text-slate-100 antialiased;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-image: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 30%), radial-gradient(circle at top right, rgba(34, 197, 94, 0.1), transparent 24%), linear-gradient(180deg, #020617 0%, #0f172a 100%);
+    }
+}
+
+@layer components {
+    .scada-panel {
+        @apply rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 shadow-glow backdrop-blur;
+    }
+
+    .scada-label {
+        @apply text-xs uppercase tracking-[0.3em] text-slate-400;
+    }
+
+    .scada-value {
+        @apply text-lg font-semibold text-white;
+    }
+
+    .status-led {
+        @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em];
+    }
+
+    .status-led::before {
+        content: '';
+        @apply h-2.5 w-2.5 rounded-full;
+    }
+}
+
+@keyframes ripple {
+    0% { transform: scale(0.95); opacity: 0.55; }
+    50% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.55; }
+}
+
+.animate-ripple {
+    animation: ripple 2.4s ease-in-out infinite;
+}
