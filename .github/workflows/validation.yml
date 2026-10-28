@@ -1,0 +1,39 @@
+name: Basic validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: PHP syntax and dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+      - name: Check PHP syntax
+        run: |
+          find app routes config database -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build frontend assets
+        run: npm run build
