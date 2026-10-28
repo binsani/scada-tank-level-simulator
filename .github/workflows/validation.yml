@@ -21,6 +21,8 @@ jobs:
           coverage: none
       - name: Validate composer.json
         run: composer validate --no-check-publish
+      - name: Check public demo route contract
+        run: php tests/Feature/PublicDemoRoutesTest.php
       - name: Check PHP syntax
         run: |
           find app routes config database -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
