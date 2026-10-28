@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Symfony\Component\HttpFoundation\Cookie;
 
 final class DemoVisitorContext
@@ -12,22 +14,34 @@ final class DemoVisitorContext
     public static function fromRequest(Request $request): array
     {
         $incoming = $request->cookie(self::COOKIE_NAME);
-        $valid = is_string($incoming) && preg_match('/\\A[a-f0-9]{64}\\z/D', $incoming) === 1;
-        $id = $valid ? $incoming : DemoStateKey::newVisitorId();
+        $id = null;
+
+        if (is_string($incoming)) {
+            try {
+                $decrypted = Crypt::decryptString($incoming);
+                if (preg_match('/\\A[a-f0-9]{64}\\z/D', $decrypted) === 1) {
+                    $id = $decrypted;
+                }
+            } catch (DecryptException $exception) {
+                // Forged, stale or corrupted cookies are replaced.
+            }
+        }
+
+        $isNew = $id === null;
+        $id ??= DemoStateKey::newVisitorId();
 
         return [
             'id' => $id,
-            'new' => ! $valid,
+            'new' => $isNew,
             'state_key' => DemoStateKey::forVisitor($id),
         ];
     }
 
     public static function cookie(string $visitorId, Request $request): Cookie
     {
-        // Cookie is HttpOnly; Secure is enforced for HTTPS requests.
         return Cookie::create(
             self::COOKIE_NAME,
-            $visitorId,
+            Crypt::encryptString($visitorId),
             now()->addMinutes((int) config('demo.visitor_ttl_minutes', 120)),
             '/',
             null,
