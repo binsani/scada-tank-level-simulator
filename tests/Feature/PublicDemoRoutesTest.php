@@ -1,27 +1,19 @@
 <?php
 
-namespace Tests\Feature;
-
-use PHPUnit\Framework\TestCase;
-
-final class PublicDemoRoutesTest extends TestCase
-{
-    public function test_public_demo_controls_remain_declared_without_auth_middleware(): void
-    {
-        $routes = file_get_contents(__DIR__.'/../../routes/api.php');
-        $this->assertNotFalse($routes);
-
-        foreach (['/start', '/stop', '/reset', '/manual', '/auto'] as $path) {
-            $this->assertStringContainsString("Route::post('".$path."'", $routes);
-        }
-
-        $this->assertStringContainsString("throttle:30,1", $routes);
-    }
-
-    public function test_health_route_is_present(): void
-    {
-        $routes = file_get_contents(__DIR__.'/../../routes/api.php');
-        $this->assertNotFalse($routes);
-        $this->assertStringContainsString("Route::get('/health'", $routes);
+// Dependency-free route contract check; run with: php tests/Feature/PublicDemoRoutesTest.php
+$routes = file_get_contents(__DIR__.'/../../routes/api.php');
+if ($routes === false) {
+    fwrite(STDERR, "Cannot read API routes.\n");
+    exit(1);
+}
+foreach (['/start', '/stop', '/reset', '/manual', '/auto'] as $path) {
+    if (!str_contains($routes, "Route::post('".$path."'")) {
+        fwrite(STDERR, "Missing public simulation route: {$path}\n");
+        exit(1);
     }
 }
+if (!str_contains($routes, "throttle:30,1") || !str_contains($routes, "Route::get('/health'")) {
+    fwrite(STDERR, "Expected API throttle or health route missing.\n");
+    exit(1);
+}
+echo "Public demo route contract checks passed.\n";
