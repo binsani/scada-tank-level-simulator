@@ -1,6 +1,6 @@
 # Tank Level SCADA Simulator
 
-An open-source, production-ready industrial water tank SCADA & HMI simulator built on **Laravel 12**, **Tailwind CSS**, and **Vite**. 
+An open-source industrial water tank SCADA & HMI simulator built on **Laravel 12**, **Tailwind CSS**, and **Vite**. 
 
 This project simulates a real-time PLC-controlled water tank, providing telemetry dashboarding, multi-level safety alarms, operator control actions, detailed operational reports, and operator profile management. It is designed to serve as a reference architecture for SCADA/HMI web interfaces.
 
@@ -57,8 +57,8 @@ This project simulates a real-time PLC-controlled water tank, providing telemetr
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/your-username/scada-tank-simulator.git
-   cd scada-tank-simulator
+   git clone https://github.com/binsani/scada-tank-level-simulator.git
+   cd scada-tank-level-simulator
    ```
 
 2. **Install PHP & Frontend Dependencies**
