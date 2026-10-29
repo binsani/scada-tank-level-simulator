@@ -19,7 +19,7 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorA = DemoStateKey::newVisitorId();
         $visitorB = DemoStateKey::newVisitorId();
 
-        $this->withCookie('scada_demo_visitor', $visitorA)
+        $this->withUnencryptedCookie('scada_demo_visitor', $visitorA)
             ->getJson('/api/events')->assertOk();
 
         $keyA = hash('sha256', DemoStateKey::forVisitor($visitorA));
@@ -29,13 +29,13 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         Event::create(['type' => 'visitor-b', 'message' => 'B only', 'demo_visitor_key' => $keyB]);
         Event::create(['type' => 'legacy', 'message' => 'Shared legacy record']);
 
-        $this->withCookie('scada_demo_visitor', $visitorA)
+        $this->withUnencryptedCookie('scada_demo_visitor', $visitorA)
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'visitor-a');
 
-        $this->withCookie('scada_demo_visitor', $visitorB)
+        $this->withUnencryptedCookie('scada_demo_visitor', $visitorB)
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
@@ -50,10 +50,10 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorA = DemoStateKey::newVisitorId();
         $visitorB = DemoStateKey::newVisitorId();
 
-        $this->withCookie('scada_demo_visitor', $visitorA)
+        $this->withUnencryptedCookie('scada_demo_visitor', $visitorA)
             ->postJson('/api/start')->assertOk();
 
-        $this->withCookie('scada_demo_visitor', $visitorB)
+        $this->withUnencryptedCookie('scada_demo_visitor', $visitorB)
             ->postJson('/api/reset')->assertOk();
 
         $stateA = Cache::get(DemoStateKey::forVisitor($visitorA));
