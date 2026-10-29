@@ -10,6 +10,7 @@ class Event extends Model
     use HasFactory;
 
     protected $fillable = [
+        'demo_visitor_key',
         'tank_id',
         'type',
         'message',
