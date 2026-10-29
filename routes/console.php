@@ -3,6 +3,11 @@
 use Illuminate\Support\Facades\Artisan;
 
 Artisan::command('scada:tick {--loop : Run continuously in a loop} {--interval=1 : Loop interval in seconds}', function (\App\Services\SimulationEngine $engine): void {
+    if (config('demo.visitor_isolation_enabled', false)) {
+        $this->error('scada:tick is unavailable when visitor isolation is enabled. Visitor simulations advance through their own HTTP requests.');
+        return;
+    }
+
     $loop = (bool) $this->option('loop');
     $interval = max(1, (int) $this->option('interval'));
 
