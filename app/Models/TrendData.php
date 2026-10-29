@@ -10,6 +10,7 @@ class TrendData extends Model
     use HasFactory;
 
     protected $fillable = [
+        'demo_visitor_key',
         'tank_level',
         'pressure',
         'temperature',

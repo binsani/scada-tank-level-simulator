@@ -11,6 +11,7 @@ class Alarm extends Model
     use HasFactory;
 
     protected $fillable = [
+        'demo_visitor_key',
         'tank_id',
         'priority',
         'message',
