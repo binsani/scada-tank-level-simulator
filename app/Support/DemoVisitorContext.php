@@ -16,6 +16,16 @@ final class DemoVisitorContext
         return (bool) config('demo.visitor_isolation_enabled', false);
     }
 
+    public function historyKey(): ?string
+    {
+        if (! $this->enabled()) {
+            return null;
+        }
+
+        // Hash the opaque state namespace; never persist raw cookie identifiers.
+        return hash('sha256', $this->stateKey());
+    }
+
     public function stateKey(): string
     {
         if (! $this->enabled()) {
