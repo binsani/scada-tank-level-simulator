@@ -23,6 +23,8 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $this->withCookie('scada_demo_visitor', encrypt($visitorA))
             ->getJson('/api/events')->assertOk();
 
+        $this->assertSame($visitorA, app('request')->attributes->get('scada_demo_visitor_id'), 'First request must preserve supplied visitor cookie');
+
         $keyA = hash('sha256', DemoStateKey::forVisitor($visitorA));
         $keyB = hash('sha256', DemoStateKey::forVisitor($visitorB));
 
@@ -60,6 +62,8 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', encrypt($visitorB))
             ->postJson('/api/reset')->assertOk();
+
+        $this->assertSame($visitorB, app('request')->attributes->get('scada_demo_visitor_id'), 'Second request must preserve supplied visitor cookie');
 
         $stateA = Cache::get(DemoStateKey::forVisitor($visitorA));
         $stateB = Cache::get(DemoStateKey::forVisitor($visitorB));
