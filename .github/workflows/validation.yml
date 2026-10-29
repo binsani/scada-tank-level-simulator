@@ -27,6 +27,8 @@ jobs:
         run: php tests/Feature/DemoStateKeyTest.php
       - name: Check public demo route contract
         run: php tests/Feature/PublicDemoRoutesTest.php
+      - name: Check visitor history and CLI isolation contracts
+        run: php tests/Feature/DemoIsolationContractsTest.php
       - name: Check PHP syntax
         run: |
           find app routes config database -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
