@@ -22,8 +22,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PumpService::class);
         $this->app->singleton(SensorService::class);
         $this->app->singleton(AlarmManager::class);
-        $this->app->singleton(EventLogger::class);
-        $this->app->singleton(TrendRecorder::class);
+        $this->app->scoped(EventLogger::class);
+        $this->app->scoped(TrendRecorder::class);
 
         // Request-scoped so long-lived workers cannot retain another visitor's context.
         $this->app->scoped(DemoVisitorContext::class, fn ($app) => new DemoVisitorContext($app->make('request')));
