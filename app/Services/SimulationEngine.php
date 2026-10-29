@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\DemoVisitorContext;
 use App\Enums\OperatingMode;
 use App\Enums\PumpState;
 use App\Enums\SystemStatus;
@@ -11,8 +12,6 @@ use Illuminate\Support\Facades\Cache;
 
 class SimulationEngine
 {
-    private const CACHE_KEY = 'scada.simulation.state';
-
     public function __construct(
         private readonly TankService $tankService,
         private readonly PumpService $pumpService,
@@ -20,6 +19,7 @@ class SimulationEngine
         private readonly AlarmManager $alarmManager,
         private readonly EventLogger $eventLogger,
         private readonly TrendRecorder $trendRecorder,
+        private readonly DemoVisitorContext $visitorContext,
     ) {
     }
 
@@ -33,7 +33,7 @@ class SimulationEngine
 
     public function state(): array
     {
-        return Cache::get(self::CACHE_KEY, $this->defaultState());
+        return Cache::get($this->visitorContext->stateKey(), $this->defaultState());
     }
 
     public function startFilling(): array
@@ -92,7 +92,7 @@ class SimulationEngine
 
     public function reset(): array
     {
-        Cache::put(self::CACHE_KEY, $this->defaultState(), now()->addHours(6));
+        Cache::put($this->visitorContext->stateKey(), $this->defaultState(), now()->addHours(6));
         $this->eventLogger->record('Simulation Reset', 'Simulation state restored to defaults.', ['action' => 'reset']);
 
         return $this->state();
@@ -140,7 +140,7 @@ class SimulationEngine
 
     private function persist(array $state): array
     {
-        Cache::put(self::CACHE_KEY, $state, now()->addHours(6));
+        Cache::put($this->visitorContext->stateKey(), $state, now()->addHours(6));
 
         return $state;
     }
