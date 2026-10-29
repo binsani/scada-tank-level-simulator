@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DemoHistoryScope;
+
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    public function __construct(private readonly DemoHistoryScope $historyScope)
+    {
+    }
+
     public function index(): View
     {
         return view('reports', [
@@ -30,7 +36,7 @@ class ReportController extends Controller
             default => \App\Models\Event::query()->latest(),
         };
 
-        $data = $query->limit(500)->get();
+        $data = $this->historyScope->apply($query)->limit(500)->get();
 
         if ($format === 'json') {
             return response()->json([

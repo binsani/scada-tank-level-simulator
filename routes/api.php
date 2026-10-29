@@ -40,7 +40,7 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/pump', [PumpController::class, 'show']);
     Route::get('/sensors', fn (TankDataProvider $provider) => response()->json(data_get($provider->snapshot(), 'sensors', [])));
     Route::get('/alarms', [AlarmController::class, 'index']);
-    Route::get('/events', fn () => response()->json(['data' => \App\Models\Event::query()->latest()->limit(100)->get()]));
+    Route::get('/events', fn (\App\Support\DemoHistoryScope $scope) => response()->json(['data' => $scope->apply(\App\Models\Event::query())->latest()->limit(100)->get()]));
 });
 
 // SCADA Process Control Endpoints (Strictly Rate Limited)
