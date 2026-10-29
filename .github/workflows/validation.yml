@@ -21,6 +21,8 @@ jobs:
           coverage: none
       - name: Validate composer.json
         run: composer validate --no-check-publish
+      - name: Check visitor context fail-closed contract
+        run: php tests/Feature/DemoVisitorContextContractTest.php
       - name: Check visitor state key foundation
         run: php tests/Feature/DemoStateKeyTest.php
       - name: Check public demo route contract
