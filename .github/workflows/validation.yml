@@ -19,6 +19,7 @@ jobs:
           php-version: '8.3'
           tools: composer:v2
           coverage: none
+          extensions: mbstring, pdo_sqlite, sqlite3, dom, xml
       - name: Validate composer.json
         run: composer validate --no-check-publish
       - name: Check visitor context fail-closed contract
@@ -29,6 +30,10 @@ jobs:
         run: php tests/Feature/PublicDemoRoutesTest.php
       - name: Check visitor history and CLI isolation contracts
         run: php tests/Feature/DemoIsolationContractsTest.php
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Run Laravel database-backed feature tests
+        run: vendor/bin/phpunit --testsuite 'Laravel Feature'
       - name: Check PHP syntax
         run: |
           find app routes config database -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
