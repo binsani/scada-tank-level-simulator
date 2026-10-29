@@ -5,8 +5,6 @@ namespace App\Http\Middleware;
 use App\Support\DemoStateKey;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Symfony\Component\HttpFoundation\Response;
 
 class IdentifyDemoVisitor
@@ -20,15 +18,16 @@ class IdentifyDemoVisitor
         }
 
         $id = null;
+        // Laravel's EncryptCookies middleware decrypts incoming cookies before this runs.
         $encoded = $request->cookie(self::COOKIE);
 
         if (is_string($encoded)) {
             try {
-                $candidate = Crypt::decryptString($encoded);
+                $candidate = $encoded;
                 // Validate identifiers before using them as a state namespace.
                 DemoStateKey::forVisitor($candidate);
                 $id = $candidate;
-            } catch (DecryptException|\InvalidArgumentException $exception) {
+            } catch (\InvalidArgumentException $exception) {
                 // Invalid or expired cookies start a fresh anonymous demo.
             }
         }
@@ -40,10 +39,11 @@ class IdentifyDemoVisitor
         $response = $next($request);
 
         if ($newVisitor) {
+            // Laravel's EncryptCookies middleware encrypts outgoing cookies.
             $ttl = max(1, (int) config('demo.visitor_ttl_minutes', 120));
             $response->headers->setCookie(cookie(
                 self::COOKIE,
-                Crypt::encryptString($id),
+                $id,
                 $ttl,
                 '/',
                 null,
