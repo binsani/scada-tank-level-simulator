@@ -20,7 +20,7 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorB = DemoStateKey::newVisitorId();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', encrypt($visitorA))
+        $this->withCookie('scada_demo_visitor', encrypt($visitorA, false))
             ->getJson('/api/events')->assertOk();
 
         $this->assertSame($visitorA, app('request')->attributes->get('scada_demo_visitor_id'), 'First request must preserve supplied visitor cookie');
@@ -33,14 +33,14 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         Event::create(['type' => 'legacy', 'message' => 'Shared legacy record']);
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', encrypt($visitorA))
+        $this->withCookie('scada_demo_visitor', encrypt($visitorA, false))
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'visitor-a');
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', encrypt($visitorB))
+        $this->withCookie('scada_demo_visitor', encrypt($visitorB, false))
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
@@ -56,11 +56,11 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorB = DemoStateKey::newVisitorId();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', encrypt($visitorA))
+        $this->withCookie('scada_demo_visitor', encrypt($visitorA, false))
             ->postJson('/api/start')->assertOk();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', encrypt($visitorB))
+        $this->withCookie('scada_demo_visitor', encrypt($visitorB, false))
             ->postJson('/api/reset')->assertOk();
 
         $this->assertSame($visitorB, app('request')->attributes->get('scada_demo_visitor_id'), 'Second request must preserve supplied visitor cookie');
