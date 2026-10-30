@@ -47,6 +47,24 @@ class TwoVisitorIsolationFeatureTest extends TestCase
             ->assertJsonPath('data.0.type', 'visitor-b');
     }
 
+    public function test_global_ticker_refuses_to_run_when_visitor_isolation_is_enabled(): void
+    {
+        config(['demo.visitor_isolation_enabled' => true]);
+        Cache::clear();
+
+        $visitor = DemoStateKey::newVisitorId();
+        $key = DemoStateKey::forVisitor($visitor);
+        $state = ['sentinel' => 'unchanged'];
+        Cache::put($key, $state, 120);
+
+        $this->artisan('scada:tick')
+            ->expectsOutput('scada:tick is unavailable when visitor isolation is enabled. Visitor simulations advance through their own HTTP requests.')
+            ->assertExitCode(0);
+
+        $this->assertSame($state, Cache::get($key));
+        $this->assertNull(Cache::get('scada.simulation.state'));
+    }
+
     public function test_two_anonymous_visitors_have_independent_simulation_state(): void
     {
         config(['demo.visitor_isolation_enabled' => true]);
