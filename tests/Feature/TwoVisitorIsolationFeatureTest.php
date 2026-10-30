@@ -21,7 +21,7 @@ class TwoVisitorIsolationFeatureTest extends TestCase
 
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', $visitorA)
-            ->getJson('/api/events')->assertOk();
+            ->withCredentials()->getJson('/api/events')->assertOk();
 
         $this->assertSame($visitorA, app('request')->attributes->get('scada_demo_visitor_id'), 'First request must preserve supplied visitor cookie');
 
@@ -34,14 +34,14 @@ class TwoVisitorIsolationFeatureTest extends TestCase
 
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', $visitorA)
-            ->getJson('/api/events')
+            ->withCredentials()->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'visitor-a');
 
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', $visitorB)
-            ->getJson('/api/events')
+            ->withCredentials()->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'visitor-b');
@@ -57,11 +57,11 @@ class TwoVisitorIsolationFeatureTest extends TestCase
 
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', $visitorA)
-            ->postJson('/api/start')->assertOk();
+            ->withCredentials()->postJson('/api/start')->assertOk();
 
         $this->app->forgetScopedInstances();
         $this->withCookie('scada_demo_visitor', $visitorB)
-            ->postJson('/api/reset')->assertOk();
+            ->withCredentials()->postJson('/api/reset')->assertOk();
 
         $this->assertSame($visitorB, app('request')->attributes->get('scada_demo_visitor_id'), 'Second request must preserve supplied visitor cookie');
 
