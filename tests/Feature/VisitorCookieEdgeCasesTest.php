@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Support\DemoStateKey;
 use Tests\TestCase;
 
 class VisitorCookieEdgeCasesTest extends TestCase
