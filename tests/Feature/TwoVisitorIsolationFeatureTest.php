@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Event;
 use App\Support\DemoStateKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
@@ -21,7 +20,7 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorB = DemoStateKey::newVisitorId();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', $this->encryptedVisitorCookie($visitorA))
+        $this->withCookie('scada_demo_visitor', $visitorA)
             ->getJson('/api/events')->assertOk();
 
         $this->assertSame($visitorA, app('request')->attributes->get('scada_demo_visitor_id'), 'First request must preserve supplied visitor cookie');
@@ -34,14 +33,14 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         Event::create(['type' => 'legacy', 'message' => 'Shared legacy record']);
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', $this->encryptedVisitorCookie($visitorA))
+        $this->withCookie('scada_demo_visitor', $visitorA)
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'visitor-a');
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', $this->encryptedVisitorCookie($visitorB))
+        $this->withCookie('scada_demo_visitor', $visitorB)
             ->getJson('/api/events')
             ->assertOk()
             ->assertJsonCount(1, 'data')
@@ -57,11 +56,11 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $visitorB = DemoStateKey::newVisitorId();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', $this->encryptedVisitorCookie($visitorA))
+        $this->withCookie('scada_demo_visitor', $visitorA)
             ->postJson('/api/start')->assertOk();
 
         $this->app->forgetScopedInstances();
-        $this->withCookie('scada_demo_visitor', $this->encryptedVisitorCookie($visitorB))
+        $this->withCookie('scada_demo_visitor', $visitorB)
             ->postJson('/api/reset')->assertOk();
 
         $this->assertSame($visitorB, app('request')->attributes->get('scada_demo_visitor_id'), 'Second request must preserve supplied visitor cookie');
@@ -72,12 +71,5 @@ class TwoVisitorIsolationFeatureTest extends TestCase
         $this->assertNotNull($stateA);
         $this->assertNotNull($stateB);
         $this->assertNotEquals($stateA, $stateB);
-    }
-    private function encryptedVisitorCookie(string $visitorId): string
-    {
-        $name = 'scada_demo_visitor';
-        $prefix = CookieValuePrefix::create($name, app('encrypter')->getKey());
-
-        return encrypt($prefix.$visitorId, false);
     }
 }
