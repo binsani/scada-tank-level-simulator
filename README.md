@@ -92,11 +92,15 @@ This project simulates a real-time PLC-controlled water tank, providing telemetr
    ```
    *The application will now be available at `http://localhost:8000`*
 
-6. **Start the Simulation Ticker Daemon**
-   In a separate terminal tab, run the background simulation:
+6. **Choose the Simulation Tick Mode**
+   For the public, anonymous, visitor-isolated demo, set `SCADA_VISITOR_ISOLATION_ENABLED=true` in `.env`. Each visitor's simulation advances through their own HTTP requests; **do not start the global ticker** in this mode. The `scada:tick` command intentionally exits with an error when visitor isolation is enabled.
+
+   Only when visitor isolation is explicitly disabled (`SCADA_VISITOR_ISOLATION_ENABLED=false`), run the shared-state background ticker in a separate terminal:
    ```bash
    php artisan scada:tick --loop --interval=1
    ```
+
+   **Warning:** Shared-state mode allows different visitors to interact with the same simulation. Use visitor isolation for a public multi-visitor demo; neither mode requires login for simulation controls.
 
 ### 🐳 Running with Docker
 A production-ready multi-container architecture is included in `docker-compose.yml`:
