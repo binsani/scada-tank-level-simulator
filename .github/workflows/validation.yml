@@ -36,6 +36,8 @@ jobs:
           chmod -R u+rwX bootstrap/cache storage
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Audit PHP dependencies for known vulnerabilities
+        run: composer audit --locked --no-interaction
       - name: Run Laravel database-backed feature tests
         run: vendor/bin/phpunit --testsuite 'Laravel Feature'
       - name: Check PHP syntax
@@ -52,5 +54,7 @@ jobs:
           node-version: '20'
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
+      - name: Audit npm dependencies for high or critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Build frontend assets
         run: npm run build
