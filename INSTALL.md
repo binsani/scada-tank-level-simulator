@@ -89,11 +89,11 @@ The app will be available at: **http://localhost:8000**
 npm run dev
 ```
 
-## Step 6: Login
+## Step 6: Open the Public Simulator
 
 - **URL**: http://localhost:8000
-- **Email**: operator@scada.local
-- **Password**: password
+- Simulation controls are intentionally available without login in this educational demo.
+- Do not deploy this simulator against real PLCs or industrial control systems.
 
 ## Troubleshooting
 
@@ -150,7 +150,25 @@ php artisan view:clear
 ```env
 APP_ENV=production
 APP_DEBUG=false
+APP_URL=https://your-demo-domain.example
+SCADA_VISITOR_ISOLATION_ENABLED=true
 ```
+
+For a public demo, use HTTPS, a unique `APP_KEY`, and an isolated database/cache. Existing deployments must update their actual `.env` or hosting environment: copying `.env.example` in Git does **not** change production settings. Never post your `.env` file or secret values to an issue or support chat.
+
+### Verify anonymous visitor isolation
+
+From the deployed project directory, check the **effective** Laravel configuration (not only the text of `.env`):
+
+```bash
+php artisan config:clear
+php artisan config:cache
+php artisan tinker --execute="dump(config('demo.visitor_isolation_enabled'));"
+```
+
+The output should be `true`. If configuration is managed by your hosting platform, set `SCADA_VISITOR_ISOLATION_ENABLED=true` there before rebuilding the configuration cache. Remove any supervisor, cron job, or container command running `php artisan scada:tick`: isolated visitors advance their own simulations through HTTP requests. Do not disable visitor isolation just to make the global ticker run.
+
+For a browser smoke test, open the public demo in two independent private browsing sessions, start the tank in one session, and verify that the second session's state is unaffected. Check `/api/tank` in both sessions; do not assume two tabs in the same browser represent separate visitors. Simulation controls must remain usable without login.
 
 ### 2. Optimize
 ```bash
