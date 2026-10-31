@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PublicAnonymousControlsRegressionTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_simulation_controls_remain_public_without_authentication(): void
     {
         config(['demo.visitor_isolation_enabled' => false]);

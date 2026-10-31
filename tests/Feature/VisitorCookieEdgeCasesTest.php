@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class VisitorCookieEdgeCasesTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_missing_cookie_issues_new_anonymous_identity_without_login(): void
     {
         config(['demo.visitor_isolation_enabled' => true]);

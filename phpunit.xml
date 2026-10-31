@@ -6,6 +6,8 @@
     <testsuites>
         <testsuite name="Laravel Feature">
             <directory suffix="FeatureTest.php">tests/Feature</directory>
+            <file>tests/Feature/PublicAnonymousControlsRegressionTest.php</file>
+            <file>tests/Feature/VisitorCookieEdgeCasesTest.php</file>
         </testsuite>
     </testsuites>
     <php>

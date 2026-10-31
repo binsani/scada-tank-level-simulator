@@ -13,15 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // IdentifyDemoVisitor runs after cookie decryption on web requests.
-        $middleware->web(append: [
-            \App\Http\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \App\Http\Middleware\VerifyCsrfToken::class,
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\IdentifyDemoVisitor::class,
-        ]);
+        $middleware->web(
+            replace: [
+                \Illuminate\Cookie\Middleware\EncryptCookies::class => \App\Http\Middleware\EncryptCookies::class,
+            ],
+            append: [\App\Http\Middleware\IdentifyDemoVisitor::class],
+        );
 
         // API requests do not use Laravel's web session, but must decode
         // the same encrypted visitor cookie before identifying the visitor.
