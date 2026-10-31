@@ -27,8 +27,12 @@ class ReportController extends Controller
 
     public function export(Request $request): mixed
     {
-        $type = $request->query('type', 'events');
-        $format = strtolower($request->query('format', 'csv'));
+        $validated = $request->validate([
+            'type' => ['sometimes', 'string', 'in:events,alarms,trends'],
+            'format' => ['sometimes', 'string', 'in:csv,json'],
+        ]);
+        $type = $validated['type'] ?? 'events';
+        $format = $validated['format'] ?? 'csv';
 
         $query = match ($type) {
             'alarms' => \App\Models\Alarm::query()->latest(),
@@ -62,7 +66,18 @@ class ReportController extends Controller
             if ($data->isNotEmpty()) {
                 fputcsv($file, array_keys($data->first()->toArray()));
                 foreach ($data as $row) {
-                    fputcsv($file, $row->toArray());
+                    fputcsv($file, array_map(static function ($value) {
+                        // Preserve structured metadata and prevent spreadsheet formula execution.
+                        if (is_array($value)) {
+                            $value = json_encode($value, JSON_THROW_ON_ERROR);
+                        }
+
+                        if (is_string($value) && preg_match('/\A[\x00-\x20]*[=+@-]/', $value)) {
+                            return "'".$value;
+                        }
+
+                        return $value;
+                    }, $row->toArray()));
                 }
             }
             fclose($file);
